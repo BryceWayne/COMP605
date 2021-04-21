@@ -1,0 +1,8 @@
+Total Time: 0s, In: 9, Total: 10, Approx. Pi: 3.6000000
+Total Time: 0s, In: 85, Total: 100, Approx. Pi: 3.4000000
+Total Time: 999.5µs, In: 779, Total: 1000, Approx. Pi: 3.1160000
+Total Time: 6.9983ms, In: 7926, Total: 10000, Approx. Pi: 3.1704000
+Total Time: 54.999ms, In: 78496, Total: 100000, Approx. Pi: 3.1398400
+Total Time: 539.9992ms, In: 784304, Total: 1000000, Approx. Pi: 3.1372160
+Total Time: 5.8303486s, In: 7843366, Total: 10000000, Approx. Pi: 3.1373460
+Total Time: 56.2480323s, In: 78453392, Total: 100000000, Approx. Pi: 3.1381360
