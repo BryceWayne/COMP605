@@ -1,151 +1,117 @@
+// This really helped!
+// Source: https://github.com/btracey/mpi/blob/master/examples/bounce/bounce.go
+
 /*
-Bounce tests the speed and latency of the underlying network. It sends a suite
-of messages between even-odd pairs of nodes in the network. This problem must
-be run on an even number of nodes.
+HW04 tests the speed and latency of the underlying network. It sends a suite
+of messages between two nodes in the network. This problem must
+be run on two nodes.
+
 To run on a single machine:
-go get github.com/btracey/mpi
-go install github.com/btracey/mpi/examples/bounce
-Then, in four different terminals, run one each of
-    bounce -mpi-addr=":5000" -mpi-alladdr=":5000,:5001,:5003,:5004"
-    bounce -mpi-addr=":5001" -mpi-alladdr=":5000,:5001,:5003,:5004"
-    bounce -mpi-addr=":5003" -mpi-alladdr=":5000,:5001,:5003,:5004"
-    bounce -mpi-addr=":5003" -mpi-alladdr=":5000,:5001,:5003,:5004"
-    bounce -mpi-addr=":5004" -mpi-alladdr=":5000,:5001,:5003,:5004"
+
+Then, in two different terminals, run one each of
+    bounce -mpi-addr=":5000" -mpi-alladdr=":5000,:5001"
+    bounce -mpi-addr=":5001" -mpi-alladdr=":5000,:5001"
 */
 package main
 
 import (
-    "bytes"
-    "encoding/binary"
-    "flag"
-    "fmt"
-    "log"
-    "math/rand"
-    "time"
+	"bytes"
+	"encoding/binary"
+	"flag"
+	"fmt"
+	"log"
+	"math/rand"
+	"time"
 
-    "github.com/btracey/mpi"
-    "github.com/gonum/floats"
+	"github.com/btracey/mpi"
 )
 
 // length of message. Must be in increasing order
-var msgLengths = []int{0, 1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7}
+var msgLengths = []int{1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9}
 
-var nRepeats int64 = 10
+var nRepeats int64 = 100
 
 func main() {
-    rand.Seed(time.Now().UnixNano())
-    flag.Parse()
+	rand.Seed(time.Now().UnixNano())
+	flag.Parse()
 
-    // Initialize MPI
-    err := mpi.Init()
-    if err != nil {
-        log.Fatal("error initializing: ", err)
-    }
-    defer mpi.Finalize()
+	// Initialize MPI
+	err := mpi.Init()
+	if err != nil {
+		log.Fatal("There was an error initializing MPI: ", err)
+	}
+	defer mpi.Finalize()
 
-    // Second check that things started okay
-    rank := mpi.Rank()
-    if rank < 0 {
-        log.Fatal("Incorrect initialization")
-    }
-    evenRank := rank%2 == 0
+	// Second check that things started okay
+	rank := mpi.Rank()
+	if rank < 0 {
+		log.Fatal("Incorrect initialization.")
+	}
 
-    size := mpi.Size()
-    if size%2 != 0 {
-        log.Fatal("Must have an even number of nodes for this example")
-    }
-    if rank == 0 {
-        fmt.Println("Number of nodes = ", size)
-    }
+	size := mpi.Size()
+	if size != 2 {
+		log.Fatal("ERROR:\tMust use exactly two nodes for this example.\n")
+	}
+	if rank == 0 {
+		fmt.Println("Number of nodes = ", size)
+	}
 
-    // Make a random vector of bytes
-    maxsize := msgLengths[len(msgLengths)-1]
-    message := make([]byte, maxsize)
-    //fmt.Println("...")
-    for i := 0; i < maxsize/8; i++ {
-        v := rand.Int63()
-        binary.LittleEndian.PutUint64(message[i*8:], uint64(v))
-    }
-    receive := make([]byte, maxsize)
+	// Make a random vector of bytes
+	maxsize := msgLengths[len(msgLengths)-1]
+	message := make([]byte, maxsize)
+	for i := 0; i < maxsize/8; i++ {
+		v := rand.Int63()
+		binary.LittleEndian.PutUint64(message[i*8:], uint64(v))
+	}
+	receive := make([]byte, maxsize)
 
-    messageFloats := make([]float64, maxsize/8)
-    for i := 0; i < maxsize/8; i++ {
-        messageFloats[i] = rand.Float64()
-    }
-    receiveFloats := make([]float64, maxsize/8)
+	// Do a call and response between the two nodes
+	// and record the time. The first nodes will send a message to the next
+	// node. The second node will send that message back, which will be received
+	// by the first node.
+	times := make([]int64, len(msgLengths))
+	for i, l := range msgLengths {
+		for j := int64(0); j < nRepeats; j++ {
+			// Send the byte message
+			msg := message[:l]
+			rcv := receive[:l]
+			start := time.Now()
+			if rank == 0 {
+				mpi.Send(msg, rank+1, 0) // Send message to next process
+			} else if rank == 1 {
+				mpi.Receive(&rcv, rank-1, 0) // Get message from process
+			}
+			if rank == 0 {
+				mpi.Receive(&rcv, rank+1, 0)
+			} else if rank == 1 {
+				mpi.Send(rcv, rank-1, 0)
+			}
+			times[i] += time.Since(start).Nanoseconds()
 
-    // Do a call and response between the even and the odd nodes
-    // and record the time. The even nodes will send a message to the next
-    // node. The odd nodes will send that message back, which will be received
-    // by the even node.
-    times := make([]int64, len(msgLengths))
-    timesF := make([]int64, len(msgLengths))
-    for i, l := range msgLengths {
-        for j := int64(0); j < nRepeats; j++ {
-            // Send the byte message
-            msg := message[:l]
-            rcv := receive[:l]
-            start := time.Now()
-            if evenRank {
-                mpi.Send(msg, rank+1, 0)
-            } else {
-                mpi.Receive(&rcv, rank-1, 0)
-            }
-            if evenRank {
-                mpi.Receive(&rcv, rank+1, 0)
-            } else {
-                mpi.Send(rcv, rank-1, 0)
-            }
-            times[i] += time.Since(start).Nanoseconds()
+			// verify that the received message is the same as the sent message
+			if rank == 0 {
+				if !bytes.Equal(msg, rcv) {
+					log.Fatal("Message not the same. Data loss.")
+				}
+			}
 
-            // verify that the received message is the same as the sent message
-            if evenRank {
-                if !bytes.Equal(msg, rcv) {
-                    log.Fatal("message not the same")
-                }
-            }
-            // Zero out the buffer so we don't get false positives next time
-            for i := range rcv {
-                rcv[i] = 0
-            }
+			// Zero out the buffer so we don't get false positives next time
+			for i := range rcv {
+				rcv[i] = 0
+			}
+		}
+	}
 
-            // Send the float64 message
-            msgF := messageFloats[:l/8]
-            rcvF := receiveFloats[:l/8]
-            start = time.Now()
+	// Convert the times to microseconds
+	for i := range times {
+		times[i] /= time.Microsecond.Nanoseconds()
+		times[i] /= nRepeats
+	}
 
-            if evenRank {
-                mpi.Send(msgF, rank+1, 0)
-            } else {
-                mpi.Receive(&rcvF, rank-1, 0)
-            }
-            if evenRank {
-                mpi.Receive(&rcvF, rank+1, 0)
-            } else {
-                mpi.Send(rcvF, rank-1, 0)
-            }
-            timesF[i] += time.Since(start).Nanoseconds()
-
-            // verify that the received message is the same as the sent message
-            if evenRank {
-                if !floats.Equal(msgF, rcvF) {
-                    log.Fatal("message not the same")
-                }
-            }
-        }
-    }
-
-    // Convert the times to microseconds
-    for i := range times {
-        times[i] /= time.Microsecond.Nanoseconds()
-        times[i] /= nRepeats
-        timesF[i] /= time.Microsecond.Nanoseconds()
-        timesF[i] /= nRepeats
-    }
-
-    // Have the even nodes print their trip time in microseconds
-    if evenRank {
-        fmt.Printf("Average byte trip time in µs between node %d and %d: %v\n", rank, rank+1, times)
-        fmt.Printf("Average float64 trip time in µs between node %d and %d: %v\n", rank, rank+1, timesF)
-    }
+	// Have the nodes print their trip time in microseconds
+	if rank == 0 {
+		for i, message := range msgLengths {
+			fmt.Printf("Average %d byte trip time in µs between node %d and %d is : %v\n", message, rank, rank+1, times[i])
+		}
+	}
 }
