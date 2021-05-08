@@ -17,7 +17,7 @@ The three main files for computation are `matmul.go`, `client.go` and `server.go
   cd ./bin
   ./matmul n
   ```
-  Example: ./matmul 1000
+  Example: `./matmul 1000`
 
  2. To execute a distributed matrix-matrix computation please open two terminals.
   * In Terminal one, `rsh node10`. This will connect to node 10 in the network.  
