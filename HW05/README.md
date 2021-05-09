@@ -28,3 +28,13 @@ I wrote the solution in Go.
 The code is modified from a blog post that had code which did not run out of the box.
 The bug was remedied rather easily after reading a Stack Overflow question.
 My edits amount to changing the values according to the *luminosity method*.
+
+```bash
+$ ./HW05 filename.jpg
+```
+
+**Example:** This will convert a color picture of batman, thus `batman.jpg`, into a graysacale picture.
+```bash
+$ ./HW05 batman.jpg
+```
+
