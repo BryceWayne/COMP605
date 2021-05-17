@@ -8,7 +8,7 @@
 
 * You must use the *luminosity method* to attain the effect 
 
-$$\texttt{NewImage = (0.3 * R) + (0.59 * G) + (0.11 * B)}$$
+$\texttt{NewImage = (0.3 * R) + (0.59 * G) + (0.11 * B)}$
 
 * You must produce a report, and compare using different block and grid sizes
 
